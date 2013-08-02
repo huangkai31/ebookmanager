@@ -1,0 +1,125 @@
+<html>
+    <head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/smoothness/jquery-ui.min.css" />
+    
+    <link rel="stylesheet" href="css/blueprint/screen.css" type="text/css" media="screen, projection">
+    <link rel="stylesheet" href="css/blueprint/print.css" type="text/css" media="print"> 
+    <!--[if lt IE 8]>
+      <link rel="stylesheet" href="css/blueprint/ie.css" type="text/css" media="screen, projection">
+    <![endif]-->
+
+    <script>
+    $(function() {
+        $( "#tabs" ).tabs();
+        
+        init();
+        
+        $("#button_add_new_folder").click(function(){
+            Ti.UI.currentWindow.openFolderChooserDialog(function(dir){
+                if( dir.length){
+                    //alert(dir[0]);
+                    Ti.API.info("Adding folder:"+dir[0]);
+                    var db = get_database();
+                    db.execute("insert into directory values('"+dir[0]+"')");
+                    db.close();
+                    
+                    update_folder_list();
+                }
+            } );        
+        });
+        
+        $("#button_remove_folder").click(function(){
+            var folder= $("#folders").val();
+            if( folder){
+                Ti.API.info("Removing folder:"+ folder);
+                remove_folder(folder);
+            }else{
+                alert('Please select a folder from the list!') ;
+            }
+            
+        });
+    });
+    
+    function init(){
+        //set window title
+        var userwindow = Ti.UI.currentWindow;
+        userwindow.setTitle("ebook manager");
+
+        //create database if not exist
+        var db = get_database();
+        db.execute("create table if not exists directory( name text primary key)");                                           
+        db.close();
+        
+        update_folder_list();
+    }
+    
+    function get_database(){
+        return Ti.Database.openFile(Ti.Filesystem.getFile(
+                                  Ti.Filesystem.getApplicationDataDirectory(), 'ebooks.db'));
+    }
+    
+    function update_folder_list(){
+        var db = get_database();
+        var rows = db.execute("select * from directory");
+        $("#folders").empty();
+        while( rows.isValidRow()){
+            Ti.API.info("Directory:"+ rows.fieldByName("name"));
+            $("#folders").append("<option>"+rows.fieldByName("name")+"</option>");            
+            rows.next();
+        }
+        rows.close();
+        db.close();
+    }
+    
+    function remove_folder(folder){
+        var db = get_database();
+        db.execute("delete from directory where name='"+folder+"'");
+        //TODO: remove books from the database as well
+        
+        update_folder_list();
+        var notification = Ti.Notification.createNotification({
+            'title' : 'Notice',
+            'message' : 'Folder: '+folder+" removed",
+            'timeout' : 10
+            
+                
+        });
+        
+        notification.show();
+    }
+    
+    </script>
+    </head>
+    <body >
+        <div id="tabs">
+            <ul>
+            <li><a href="#tabs-1">Books</a></li>
+            <li><a href="#tabs-2">Settings</a></li>
+            </ul>
+            <div id="tabs-1">
+            <p>Proin elit arcu, rutrum commodo, vehicula tempus, commodo a, risus. Curabitur nec arcu. Donec sollicitudin mi sit amet mauris. Nam elementum quam ullamcorper ante. Etiam aliquet massa et lorem. Mauris dapibus lacus auctor risus. Aenean tempor ullamcorper leo. Vivamus sed magna quis ligula eleifend<img src="../manifest" alt="manifest, 431B" title="Manifest" border="0" height="0" width="0">
+             adipiscing. Duis orci. Aliquam sodales tortor vitae ipsum. Aliquam nulla. Duis aliquam molestie erat. Ut et mauris vel pede varius sollicitudin. Sed ut dolor nec orci tincidunt interdum. Phasellus ipsum. Nunc tristique tempus lectus.</p>
+            </div>
+            <div id="tabs-2">
+                <div  >
+                    <div class="span-10 border">
+                        <select id="folders" class="span-9" size=10></select>
+                    </div>
+                    <div class="span-5 last">
+                        <table style="height:150px">
+                        <tr><td><input type='button' id="button_remove_folder" value='Remove Folder'></td></tr>
+                        <tr><td><input type='button' id="button_scan_folder" value='Scan Folder'></td></tr>
+                        
+                        </table>
+                    </div>
+                    
+                    <div class="span-10">
+                        <input type='button' id="button_add_new_folder" value="Add New Folder">
+                    </div>
+                </div>                
+            </div>
+        </div>    
+    </body>
+</html>
