@@ -40,6 +40,22 @@
             }
             
         });
+        
+        $("#button_scan_folder").click(function(){
+            var folder= $("#folders").val();
+            if( folder){
+                Ti.API.info("Scanning folder:"+ folder);
+                var worker= Ti.Worker.createWorker(scan_folder_worker);
+                worker.postMessage(folder);
+                worker.onmessage= function(event){
+                    $("#message").text(event.message);
+                };
+                worker.start();
+                
+            }else{
+                alert('Please select a folder from the list!') ;
+            }
+        });
     });
     
     function init(){
@@ -49,7 +65,8 @@
 
         //create database if not exist
         var db = get_database();
-        db.execute("create table if not exists directory( name text primary key)");                                           
+        db.execute("create table if not exists directory( name text primary key)");  
+        db.execute("create table if not exists book(id integer primary key, path text, name text)");                                         
         db.close();
         
         update_folder_list();
@@ -90,6 +107,64 @@
         notification.show();
     }
     
+    
+    
+    function scan_folder_worker(){
+        this.get_database= function(){
+            return Ti.Database.openFile(Ti.Filesystem.getFile(
+                                      Ti.Filesystem.getApplicationDataDirectory(), 'ebooks.db'));
+        };
+        
+        this.db= this.get_database();
+        this.root_folder="";
+                                  
+        this.onmessage= function(event){
+            this.root_folder=event.message;
+            Ti.API.info("Scaning:"+this.root_folder);
+            
+            
+            
+            //step 1: scan files to insert
+            this.scan_folder( this.root_folder, this);
+            
+            //step 2: verify files still exist
+            
+            this.postMessage("Scan finished:"+this.root_folder);
+               
+        };
+        
+        this.scan_folder=function(folder, parent){
+            parent.postMessage("Scanning:"+ folder);
+            var db= parent.db;
+            var dir =  Ti.Filesystem.getFile(folder);
+            var files= dir.getDirectoryListing();
+            for(var i=0; i< files.length; i++ ){
+                
+                if( files[i].isFile()){
+                    Ti.API.info("File:"+ files[i].name());
+                    
+                    //add the file to database
+                    
+                    db.execute("insert into book(path, name) values( '"+folder+"','"+files[i].name()+"')");
+                }else if( files[i].isDirectory()){
+                    Ti.API.info("Dir:"+files[i]);
+                    parent.scan_folder( files[i].nativePath(), parent);
+                }
+                
+            }
+        };
+        
+    }
+    
+    function scan_folder(folder){
+        Ti.API.info( folder);
+        var dir =  Ti.Filesystem.getFile(folder);
+        var files= dir.getDirectoryListing();
+        for(var i=0; i< files.length; i++ ){
+            Ti.API.info( files[i]);
+        }
+    }
+    
     </script>
     </head>
     <body >
@@ -103,7 +178,7 @@
              adipiscing. Duis orci. Aliquam sodales tortor vitae ipsum. Aliquam nulla. Duis aliquam molestie erat. Ut et mauris vel pede varius sollicitudin. Sed ut dolor nec orci tincidunt interdum. Phasellus ipsum. Nunc tristique tempus lectus.</p>
             </div>
             <div id="tabs-2">
-                <div  >
+                <div class="container" style="width:700px" >
                     <div class="span-10 border">
                         <select id="folders" class="span-9" size=10></select>
                     </div>
@@ -115,8 +190,11 @@
                         </table>
                     </div>
                     
-                    <div class="span-10">
+                    <div class="span-15 last">
                         <input type='button' id="button_add_new_folder" value="Add New Folder">
+                    </div>
+                    <div class="span-15 last">
+                        Message:<span id="message" ></span>
                     </div>
                 </div>                
             </div>
