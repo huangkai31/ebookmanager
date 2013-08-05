@@ -66,7 +66,8 @@
         //create database if not exist
         var db = get_database();
         db.execute("create table if not exists directory( name text primary key)");  
-        db.execute("create table if not exists book(id integer primary key, path text, name text)");                                         
+        db.execute("create table if not exists book(id integer primary key, root text, path text, name text, extension text, status integer, isfavor integer, tags text, touch integer)"); 
+        db.execute("create unique index if not exists book_index on book (path, name) " );                                        
         db.close();
         
         update_folder_list();
@@ -122,8 +123,6 @@
             this.root_folder=event.message;
             Ti.API.info("Scaning:"+this.root_folder);
             
-            
-            
             //step 1: scan files to insert
             this.scan_folder( this.root_folder, this);
             
@@ -135,6 +134,7 @@
         
         this.scan_folder=function(folder, parent){
             parent.postMessage("Scanning:"+ folder);
+            var ebook_extensions= "pdf,chm";
             var db= parent.db;
             var dir =  Ti.Filesystem.getFile(folder);
             var files= dir.getDirectoryListing();
@@ -143,9 +143,27 @@
                 if( files[i].isFile()){
                     Ti.API.info("File:"+ files[i].name());
                     
-                    //add the file to database
+                    //decide if it is a ebook: pdf, chm
+                    if( ebook_extensions.indexOf( files[i].extension()) >=0){                    
                     
-                    db.execute("insert into book(path, name) values( '"+folder+"','"+files[i].name()+"')");
+                        //add the file to database
+                        try{
+                            //find if the file already exist
+                            var rows= db.execute("select id from book where path='"+folder+"' and name='"+ escape(files[i].name())+"' ");
+                            if( rows.isValidRow()){
+                                //existing book
+                                var id= rows.fieldByName("id");
+                                Ti.API.info("Exist "+id+ " "+ escape(files[i].name())); 
+                                db.execute("update book set touch=1 where id="+id);   
+                            }else{
+                                // new book
+                                db.execute("insert into book(root, path, name, extension, status, isfavor, touch) values('"+parent.root_folder+"', '"+folder+"','"+ escape(files[i].name())+"', '"+files[i].extension()+"', 0, 0, 1)");
+                            }
+                        }catch(err){
+                            Ti.API.error( err);
+                        }
+                    }
+                    
                 }else if( files[i].isDirectory()){
                     Ti.API.info("Dir:"+files[i]);
                     parent.scan_folder( files[i].nativePath(), parent);
