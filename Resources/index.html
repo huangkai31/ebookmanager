@@ -48,13 +48,29 @@
                 var worker= Ti.Worker.createWorker(scan_folder_worker);
                 worker.postMessage(folder);
                 worker.onmessage= function(event){
-                    $("#message").text(event.message);
+                    if( event.message.status ==1 ){
+                        $("#button_scan_folder").attr("disabled","disabled");
+                    } else if( event.message.status==0){
+                        $("#button_scan_folder").removeAttr("disabled");     
+                    }
+                    $("#message").text(event.message.message);
                 };
                 worker.start();
                 
             }else{
                 alert('Please select a folder from the list!') ;
             }
+        });
+        
+        $("#button_search_book").click(function(){
+            var search_text= $("#search_text").val();
+            var search_status= $("#search_status").val();
+            var search_favor= $("#search_favor").val();
+            
+            var sql="select * from book where id>0 ";
+            if(search_text.length >0 ){
+                sql+=" path like '%"+search_text+"%' "
+            }    
         });
     });
     
@@ -123,6 +139,7 @@
         this.onmessage= function(event){
             this.root_folder=event.message;
             Ti.API.info("Scaning:"+this.root_folder);
+            this.postMessage({"status":1, "message":"Scanning "+this.root_folder});
             
             var db= this.db;
             db.execute("update book set touch=0 where root='"+this.root_folder+"'");
@@ -133,12 +150,12 @@
             //step 2: remove those books that touch=0
             db.execute("delete from book where touch=0");
                         
-            this.postMessage("Scan finished:"+this.root_folder);
+            this.postMessage({"status":0, "message":"Scan finished "+this.root_folder});
                
         };
         
         this.scan_folder=function(folder, parent){
-            parent.postMessage("Scanning:"+ folder);
+            parent.postMessage({"status":2, "message":"Scanning:"+ folder});
             var ebook_extensions= "pdf,chm";
             var db= parent.db;
             var dir =  Ti.Filesystem.getFile(folder);
@@ -198,11 +215,22 @@
             <li><a href="#tabs-2">Settings</a></li>
             </ul>
             <div id="tabs-1">
-            <p>Proin elit arcu, rutrum commodo, vehicula tempus, commodo a, risus. Curabitur nec arcu. Donec sollicitudin mi sit amet mauris. Nam elementum quam ullamcorper ante. Etiam aliquet massa et lorem. Mauris dapibus lacus auctor risus. Aenean tempor ullamcorper leo. Vivamus sed magna quis ligula eleifend<img src="../manifest" alt="manifest, 431B" title="Manifest" border="0" height="0" width="0">
-             adipiscing. Duis orci. Aliquam sodales tortor vitae ipsum. Aliquam nulla. Duis aliquam molestie erat. Ut et mauris vel pede varius sollicitudin. Sed ut dolor nec orci tincidunt interdum. Phasellus ipsum. Nunc tristique tempus lectus.</p>
+                <div class="container" style="width:780px" >
+                    <div class="span-15 last">
+                        <input id='search_text' size=20 />
+                        Status:<select id="search_status">
+                            <option>Select...</option>
+                            <option value='1'>Reading</option>
+                            <option value='2'>Read</option>
+                            <option value='3'>Going to Read</option>
+                        </select>
+                        Favor:<input type='checkbox' id="search_favor" >
+                        <input type='button' id='button_search_book' value="Search">
+                    </div>            
+                </div>
             </div>
             <div id="tabs-2">
-                <div class="container" style="width:700px" >
+                <div class="container" style="width:780px" >
                     <div class="span-10 border">
                         <select id="folders" class="span-9" size=10></select>
                     </div>
