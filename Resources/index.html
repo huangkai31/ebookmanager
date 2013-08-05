@@ -94,7 +94,8 @@
     function remove_folder(folder){
         var db = get_database();
         db.execute("delete from directory where name='"+folder+"'");
-        //TODO: remove books from the database as well
+        //remove books from the database as well
+        db.execute("delete from book where root='"+folder+"'");
         
         update_folder_list();
         var notification = Ti.Notification.createNotification({
@@ -123,11 +124,15 @@
             this.root_folder=event.message;
             Ti.API.info("Scaning:"+this.root_folder);
             
+            var db= this.db;
+            db.execute("update book set touch=0 where root='"+this.root_folder+"'");
+            
             //step 1: scan files to insert
             this.scan_folder( this.root_folder, this);
             
-            //step 2: verify files still exist
-            
+            //step 2: remove those books that touch=0
+            db.execute("delete from book where touch=0");
+                        
             this.postMessage("Scan finished:"+this.root_folder);
                
         };
@@ -154,7 +159,8 @@
                                 //existing book
                                 var id= rows.fieldByName("id");
                                 Ti.API.info("Exist "+id+ " "+ escape(files[i].name())); 
-                                db.execute("update book set touch=1 where id="+id);   
+                                db.execute("update book set touch=1 where id="+id);
+                                   
                             }else{
                                 // new book
                                 db.execute("insert into book(root, path, name, extension, status, isfavor, touch) values('"+parent.root_folder+"', '"+folder+"','"+ escape(files[i].name())+"', '"+files[i].extension()+"', 0, 0, 1)");
