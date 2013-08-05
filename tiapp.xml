@@ -13,7 +13,7 @@
 <id>initial</id>
 <title>ebookmanager</title>
 <url>app://index.html</url>
-<width>800</width>
+<width>840</width>
 <max-width>3000</max-width>
 <min-width>0</min-width>
 <height>600</height>
