@@ -96,7 +96,7 @@
                 sql+=" and status="+search_status;
             }
             if( $("#search_favor").prop("checked")==true ){
-                sql+=" and favor=1 ";
+                sql+=" and isfavor=1 ";
             }    
             Ti.API.info(sql);
             
@@ -113,7 +113,7 @@
                         "name": unescape(rows.fieldByName("name")),
                         "path": rows.fieldByName("path"),
                         "status": status_names[rows.fieldByName("status")],
-                        "favor": rows.fieldByName("favor")==1?"Yes":"No",
+                        "favor": rows.fieldByName("isfavor")>0?"Yes":"No",
                         "tags": rows.fieldByName("tags")
                     });
                 rows.next();
@@ -123,6 +123,51 @@
             db.close();
             
             
+        });
+        
+        $("#button_open_book").click(function(){
+            open_book( $("#book_id").val());
+        });
+        
+        $("#button_save_book").click(function(){
+            //save into database
+            var db= get_database();
+            var id= $("#book_id").val();
+            var sql=  "update book set ";
+            if( $("#book_favor").prop("checked")==true ){
+                sql+=" isfavor=1 ";
+            }else{
+                sql+=" isfavor=0 ";
+            }
+            
+            sql+=" , status="+$("#book_status").val();
+            if( parseInt( $("#book_page").val())>0 )
+                sql+=" , page="+parseInt( $("#book_page").val());
+            else
+                sql+=" , page=0";
+            
+            sql+=", tags='"+$("#book_tags").val()+"'";
+            sql+=", comment='"+$("#book_comment").val()+"'"; 
+              
+            sql+=" where id="+id;    
+            Ti.API.info(sql);
+            db.execute(sql);      
+            
+            
+            //update row data
+            var rows= db.execute("select * from book where id="+id);
+            if( rows.isValidRow()){
+                $("#table_search_result").jqGrid('setRowData', id,{
+                        "id": rows.fieldByName("id"),
+                        "name": unescape(rows.fieldByName("name")),
+                        "path": rows.fieldByName("path"),
+                        "status": status_names[rows.fieldByName("status")],
+                        "favor": rows.fieldByName("isfavor")>0?"Yes":"No",
+                        "tags": rows.fieldByName("tags")
+                    });
+            }
+            rows.close();
+            db.close();         
         });
     });
     
@@ -135,7 +180,7 @@
         //create database if not exist
         var db = get_database();
         db.execute("create table if not exists directory( name text primary key)");  
-        db.execute("create table if not exists book(id integer primary key, root text, path text, name text, extension text, status integer, isfavor integer, tags text, touch integer)"); 
+        db.execute("create table if not exists book(id integer primary key, root text, path text, name text, extension text, status integer, isfavor integer, tags text, touch integer, page integer, comment text)"); 
         db.execute("create unique index if not exists book_index on book (path, name) " );                                        
         db.close();
         
@@ -144,31 +189,54 @@
         //jqgrid
         $("#table_search_result").jqGrid({
             datatype: "local",
-            height: 300, width:780,
+            height: 200, width:780,
             colNames:['ID','Name','Path', 'Status', 'Favor', 'Tags'],
             colModel:[
                 {name:'id', hidden:true},
-                {name:'name', width:480},
+                {name:'name', width:500},
                 {name:'path', width:100},
                 {name:'status', width:50},
-                {name:'favor', width:50},
+                {name:'favor', width:30},
                 {name:'tags', width:100}                
                 
             ],
-            rowNum: 12,
+            rowNum: 8,
             pager: "#table_search_result_pager",
             ondblClickRow: function(id){
-                 Ti.API.debug(id); 
-                 open_book(id);   
+                Ti.API.debug(id); 
+                open_book(id);   
+            },
+            onSelectRow: function(id){
+                //update book detail
+                get_book_detail(id);
             },
             caption: "Search Result"
         });
-        $("#table_search_result").jqGrid('navButtonAdd', '#table_search_result_pager', {
-            caption:"View",
-            onClickButton: function(){
-                Ti.API.debug($('#table_search_result').jqGrid('getGridParam','selrow'));            
-            }
-        });
+        
+    }
+    function get_book_detail(id){
+        var db= get_database();
+        var rows= db.execute("select * from book where id="+id);
+        if( rows.isValidRow()){
+            $("#div_book_detail").show();
+            $("#book_id").val( rows.fieldByName("id"));    
+            $("#book_name").text( unescape(rows.fieldByName("name")));
+            $("#book_path").text( unescape(rows.fieldByName("path")));
+            
+            if( rows.fieldByName("isfavor") >0)
+                $("#book_favor").attr("checked", true);
+            else
+                $("#book_favor").removeAttr('checked');
+                 
+            $("#book_status").val( rows.fieldByName("status"));
+            
+            $("#book_page").val( rows.fieldByName("page"));
+            $("#book_tags").val( rows.fieldByName("tags"));
+            $("#book_comment").val( rows.fieldByName("comment"));
+            
+        }
+        rows.close();
+        db.close();
     }
     
     function open_book(id){
@@ -331,6 +399,22 @@
                             
                         </table>
                         <div id="table_search_result_pager"></div> 
+                    </div>
+                    <div class="span-20 last hide" id="div_book_detail" >
+                        <input type='hidden' id="book_id" >
+                        Name: <span id="book_name"></span>  <br />
+                        Path: <span id="book_path"></span>  <br />
+                        Favor: <input type="checkbox" id="book_favor">
+                        Status: <select id="book_status">
+                            <option value="0">Select...</option>
+                            <option value='1'>Reading</option>
+                            <option value='2'>Read</option>
+                            <option value='3'>Going to Read</option>
+                        </select>
+                        Page: <input id="book_page" size=6 >
+                        Tags: <input id="book_tags" size=40> <br />
+                        Comment:<br /><textarea id="book_comment" style="width:600px;height:50px;"></textarea><br />
+                        <input type="button" id="button_open_book" value="Open Book" /> <input type="button" id="button_save_book" value="Save">
                     </div>          
                 </div>
                 
