@@ -189,7 +189,7 @@
         //jqgrid
         $("#table_search_result").jqGrid({
             datatype: "local",
-            height: 200, width:780,
+            height: 230, width:780,
             colNames:['ID','Name','Path', 'Status', 'Favor', 'Tags'],
             colModel:[
                 {name:'id', hidden:true},
@@ -200,7 +200,7 @@
                 {name:'tags', width:100}                
                 
             ],
-            rowNum: 8,
+            rowNum: 10,
             pager: "#table_search_result_pager",
             ondblClickRow: function(id){
                 Ti.API.debug(id); 
@@ -302,11 +302,22 @@
         
         this.db= this.get_database();
         this.root_folder="";
+        
+        this.status_message="";
+        
+        this.file_scanned=0;
+        this.file_new=0;
+        this.file_existing=0;
+        this.file_removed=0;
+        this.get_stats= function(){
+            return " Scanned:"+this.file_scanned+" New:"+this.file_new+" Existing:"+this.file_existing+" Removed:"+this.file_removed;
+        };
                                   
         this.onmessage= function(event){
             this.root_folder=event.message;
-            Ti.API.info("Scaning:"+this.root_folder);
-            this.postMessage({"status":1, "message":"Scanning "+this.root_folder});
+            //Ti.API.info("Scaning:"+this.root_folder);
+            this.status_message="Scanning "+this.root_folder;
+            this.postMessage({"status":1, "message": this.status_message });
             
             var db= this.db;
             db.execute("update book set touch=0 where root='"+this.root_folder+"'");
@@ -316,20 +327,29 @@
             
             //step 2: remove those books that touch=0
             db.execute("delete from book where touch=0");
-            db.close();            
-            this.postMessage({"status":0, "message":"Scan finished "+this.root_folder});
+            this.file_removed= db.rowsAffected;
+            db.close();
+            this.status_message="Scan finished "+this.root_folder;            
+            this.postMessage({"status":0, "message":this.status_message+this.get_stats()});
                
         };
         
         this.scan_folder=function(folder, parent){
-            parent.postMessage({"status":2, "message":"Scanning:"+ folder});
+            //parent.postMessage({"status":2, "message":"Scanning:"+folder+parent.get_stats()});
             var ebook_extensions= "pdf,chm";
             var db= parent.db;
             var dir =  Ti.Filesystem.getFile(folder);
             var files= dir.getDirectoryListing();
             for(var i=0; i< files.length; i++ ){
                 
+                
                 if( files[i].isFile()){
+                    parent.file_scanned++;
+                    
+                    if( file_scanned % 100 ==0){
+                        //parent.postMessage({"status":2, "message":"Scanning:"+folder+parent.get_stats()});    
+                    }
+                    
                     Ti.API.info("File:"+ files[i].name());
                     
                     //decide if it is a ebook: pdf, chm
@@ -340,15 +360,18 @@
                             //find if the file already exist
                             var rows= db.execute("select id from book where path='"+folder+"' and name='"+ escape(files[i].name())+"' ");
                             if( rows.isValidRow()){
+                                parent.file_existing++;
                                 //existing book
                                 var id= rows.fieldByName("id");
                                 Ti.API.info("Exist "+id+ " "+ escape(files[i].name())); 
                                 db.execute("update book set touch=1 where id="+id);
-                                rows.close();   
+                                   
                             }else{
                                 // new book
+                                parent.file_new++;
                                 db.execute("insert into book(root, path, name, extension, status, isfavor, touch) values('"+parent.root_folder+"', '"+folder+"','"+ escape(files[i].name())+"', '"+files[i].extension()+"', 0, 0, 1)");
                             }
+                            rows.close();
                         }catch(err){
                             Ti.API.error( err);
                         }
@@ -436,7 +459,7 @@
                         <input type='button' id="button_add_new_folder" value="Add New Folder">
                     </div>
                     <div class="span-15 last">
-                        Message:<span id="message" ></span>
+                        <span id="message" ></span>
                     </div>
                 </div>                
             </div>
