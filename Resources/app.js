@@ -75,7 +75,9 @@ $(function() {
         }
         if( $("#search_favor").prop("checked")==true ){
             sql+=" and isfavor=1 ";
-        }    
+        }
+        
+        sql+=" order by name, isfavor, status"    
         Ti.API.info(sql);
         
         //clear the table
